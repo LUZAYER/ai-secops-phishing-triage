@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Alert Queue{% endblock %}
+{% block page_title %}Alert Queue{% endblock %}
+
+{% block content %}
+<!-- FILTERS -->
+<div class="card card-dark mb-4">
+  <div class="card-body">
+    <form method="GET" action="/alerts/" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label small text-muted">Search</label>
+        <input class="form-control form-control-sm"
+               name="q" placeholder="Alert ID, subject, sender…" value="{{ search }}"/>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Severity</label>
+        <select class="form-select form-select-sm" name="severity">
+          <option value="">All Severities</option>
+          {% for s in severities %}
+          <option value="{{ s }}" {% if severity_filter == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">Status</label>
+        <select class="form-select form-select-sm" name="status">
+          <option value="">All</option>
+          <option value="NEW"       {% if status_filter=='NEW'       %}selected{% endif %}>New</option>
+          <option value="PROCESSED" {% if status_filter=='PROCESSED' %}selected{% endif %}>Processed</option>
+          <option value="TRIAGED"   {% if status_filter=='TRIAGED'   %}selected{% endif %}>Triaged</option>
+          <option value="ESCALATED" {% if status_filter=='ESCALATED' %}selected{% endif %}>Escalated</option>
+          <option value="CLOSED"    {% if status_filter=='CLOSED'    %}selected{% endif %}>Closed</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel me-1"></i>Filter</button>
+        <a href="/alerts/" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ALERT TABLE -->
+<div class="card card-dark">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-table me-2"></i>{{ alerts|length }} Alert(s)</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Sender</th>
+            <th>Subject</th>
+            <th>Classification</th>
+            <th>Severity</th>
+            <th>Threat Score</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for a in alerts %}
+        <tr class="alert-row" onclick="window.location='/alerts/{{ a.alert_id }}'">
+          <td><code class="text-info">{{ a.alert_id }}</code></td>
+          <td class="text-truncate" style="max-width:160px">
+            <small>{{ a.sender_email or '—' }}</small>
+          </td>
+          <td class="text-truncate" style="max-width:220px">{{ a.subject or '—' }}</td>
+          <td>
+            {% if a.classification %}
+            <span class="badge badge-class">{{ a.classification }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <span class="badge bg-{{ a.severity_color }}">{{ a.severity or '—' }}</span>
+          </td>
+          <td>
+            {% if a.threat_score is not none %}
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height:6px">
+                <div class="progress-bar {% if a.threat_score >= 70 %}bg-danger{% elif a.threat_score >= 40 %}bg-warning{% else %}bg-info{% endif %}"
+                     style="width:{{ a.threat_score }}%"></div>
+              </div>
+              <small class="text-muted">{{ a.threat_score }}</small>
+            </div>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <span class="badge bg-{{ a.status_color }}">{{ a.status }}</span>
+          </td>
+          <td onclick="event.stopPropagation()">
+            <a href="/alerts/{{ a.alert_id }}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-5">
+          No alerts found. Click <strong>Run Triage</strong> to process your dataset.
+        </td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

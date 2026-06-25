@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ filename }}{% endblock %}
+{% block page_title %}{{ filename }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <a href="/reports/" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  <a href="/reports/{{ filename }}/download" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-download me-1"></i>Download
+  </a>
+</div>
+<div class="card card-dark">
+  <div class="card-body">
+    <textarea id="raw-markdown" style="display:none;">{{ content }}</textarea>
+    <div id="report-content" class="markdown-body"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const raw = document.getElementById('raw-markdown').value;
+  document.getElementById('report-content').innerHTML = marked.parse(raw);
+  hljs.highlightAll();
+</script>
+{% endblock %}

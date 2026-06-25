@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}{{ alert.alert_id }}{% endblock %}
+{% block page_title %}Alert: {{ alert.alert_id }}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- LEFT: Email Details -->
+  <div class="col-lg-6">
+    <div class="card card-dark mb-4">
+      <div class="card-header"><i class="bi bi-envelope me-2"></i>Email Details</div>
+      <div class="card-body">
+        <dl class="row mb-0 detail-dl">
+          <dt>Alert ID</dt>
+          <dd><code class="text-info">{{ alert.alert_id }}</code></dd>
+          <dt>Reported By</dt>
+          <dd>{{ alert.reported_by or '—' }}</dd>
+          <dt>Sender</dt>
+          <dd>{{ alert.sender_display_name or '' }} &lt;{{ alert.sender_email }}&gt;</dd>
+          <dt>Subject</dt>
+          <dd>{{ alert.subject }}</dd>
+          <dt>Reported At</dt>
+          <dd><small class="text-muted">{{ alert.reported_at }}</small></dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card card-dark mb-4">
+      <div class="card-header"><i class="bi bi-body-text me-2"></i>Body</div>
+      <div class="card-body">
+        <pre class="body-pre">{{ alert.body_text }}</pre>
+      </div>
+    </div>
+
+    <!-- IOC Panel -->
+    <div class="card card-dark mb-4">
+      <div class="card-header"><i class="bi bi-search me-2"></i>Indicators of Compromise</div>
+      <div class="card-body">
+        <h6 class="small text-muted mb-2">AUTH HEADERS</h6>
+        <div class="d-flex gap-2 mb-3 flex-wrap">
+          <span class="badge {% if alert.spf == 'fail' %}bg-danger{% else %}bg-success{% endif %}">
+            SPF: {{ alert.spf | upper }}
+          </span>
+          <span class="badge {% if alert.dkim == 'fail' %}bg-danger{% else %}bg-success{% endif %}">
+            DKIM: {{ alert.dkim | upper }}
+          </span>
+          <span class="badge {% if alert.dmarc == 'fail' %}bg-danger{% else %}bg-success{% endif %}">
+            DMARC: {{ alert.dmarc | upper }}
+          </span>
+        </div>
+
+        {% if alert.urls_list %}
+        <h6 class="small text-muted mb-2">URLS</h6>
+        <ul class="list-unstyled mb-3">
+          {% for u in alert.urls_list %}
+          <li class="mb-1"><i class="bi bi-link-45deg text-warning me-1"></i>
+            <code class="text-warning">{{ u }}</code>
+            <a href="https://www.virustotal.com/gui/search?query={{ u | urlencode }}" target="_blank" class="badge bg-primary text-decoration-none ms-2">
+              VT Search
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if alert.attachments_list %}
+        <h6 class="small text-muted mb-2">ATTACHMENTS</h6>
+        <ul class="list-unstyled mb-0">
+          {% for att in alert.attachments_list %}
+          <li><i class="bi bi-paperclip text-danger me-1"></i>
+            <code class="text-danger">{{ att.filename }}</code>
+            <span class="badge bg-danger-subtle text-danger ms-1">{{ att.extension }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: AI Analysis -->
+  <div class="col-lg-6">
+    <!-- Threat Score -->
+    <div class="card card-dark mb-4 border-{% if alert.threat_score >= 70 %}danger{% elif alert.threat_score >= 40 %}warning{% else %}info{% endif %}">
+      <div class="card-header"><i class="bi bi-speedometer me-2"></i>Threat Score</div>
+      <div class="card-body text-center">
+        <div class="threat-score-ring
+          {% if alert.threat_score >= 70 %}ring-critical{% elif alert.threat_score >= 40 %}ring-high{% else %}ring-low{% endif %}">
+          <span class="score-value">{{ alert.threat_score or 0 }}</span>
+          <span class="score-max">/100</span>
+        </div>
+        <div class="mt-2 text-muted small">Combined AI + Signal Scoring</div>
+      </div>
+    </div>
+
+    <!-- AI Analysis Card -->
+    <div class="card card-dark mb-4">
+      <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Analysis
+        <span class="badge bg-secondary ms-2">qwen3:8b</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div class="analysis-field">
+              <div class="analysis-label">Classification</div>
+              <div class="analysis-value">{{ alert.classification or '—' }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="analysis-field">
+              <div class="analysis-label">Severity</div>
+              <div class="analysis-value">
+                <span class="badge bg-{% if alert.severity=='Critical' %}danger{% elif alert.severity=='High' %}warning{% elif alert.severity=='Medium' %}info{% else %}secondary{% endif %} fs-6">
+                  {{ alert.severity or '—' }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="analysis-field">
+              <div class="analysis-label">Confidence</div>
+              <div class="analysis-value fw-bold">{{ alert.confidence or 0 }}%</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="analysis-field">
+              <div class="analysis-label">Status</div>
+              <div class="analysis-value">
+                <span class="badge bg-{{ alert.status_color }}">{{ alert.status }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if alert.tactics_list %}
+        <h6 class="small text-muted mb-2">SOCIAL ENGINEERING TACTICS</h6>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% for t in alert.tactics_list %}
+          <span class="badge bg-purple-subtle text-purple border border-purple-subtle">{{ t }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <h6 class="small text-muted mb-1">RATIONALE</h6>
+        <p class="small mb-3">{{ alert.rationale or '—' }}</p>
+
+        <h6 class="small text-muted mb-1">RECOMMENDED ACTION</h6>
+        <p class="small text-info mb-0">
+          <i class="bi bi-arrow-right-circle me-1"></i>{{ alert.recommended_action or '—' }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Analyst Actions -->
+    <div class="card card-dark mb-4">
+      <div class="card-header"><i class="bi bi-person-gear me-2"></i>Analyst Actions</div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <form method="POST" action="/alerts/{{ alert.alert_id }}/status">
+            <input type="hidden" name="status" value="TRIAGED"/>
+            <button class="btn btn-sm btn-outline-info" type="submit">
+              <i class="bi bi-check2-circle me-1"></i>Mark Triaged
+            </button>
+          </form>
+          <form method="POST" action="/alerts/{{ alert.alert_id }}/status">
+            <input type="hidden" name="status" value="ESCALATED"/>
+            <button class="btn btn-sm btn-outline-warning" type="submit">
+              <i class="bi bi-arrow-up-circle me-1"></i>Escalate
+            </button>
+          </form>
+          <form method="POST" action="/alerts/{{ alert.alert_id }}/status">
+            <input type="hidden" name="status" value="CLOSED"/>
+            <button class="btn btn-sm btn-outline-success" type="submit">
+              <i class="bi bi-x-circle me-1"></i>Close
+            </button>
+          </form>
+          <button class="btn btn-sm btn-primary" type="button"
+                  hx-post="/api/reanalyze/{{ alert.alert_id }}" hx-swap="none"
+                  onclick="this.disabled=true; this.innerHTML='<i class=\'bi bi-arrow-repeat spin me-1\'></i>Analyzing...'; showToast('Re-Analysis Started', 'Qwen is analyzing this alert. The page will auto-reload in 10 seconds.', 'info'); setTimeout(()=>{window.location.reload()}, 10000)">
+            <i class="bi bi-arrow-repeat me-1"></i>Re-Analyze
+          </button>
+        </div>
+
+        <!-- Analyst Notes -->
+        <h6 class="small text-muted mb-2">ANALYST NOTES</h6>
+        {% for n in notes %}
+        <div class="note-bubble mb-2">
+          <div class="note-text">{{ n.note }}</div>
+          <div class="note-time text-muted">{{ n.created_at }}</div>
+        </div>
+        {% else %}
+        <p class="text-muted small">No notes yet.</p>
+        {% endfor %}
+
+        <form method="POST" action="/alerts/{{ alert.alert_id }}/note" class="mt-2">
+          <div class="input-group input-group-sm">
+            <input class="form-control"
+                   name="note" placeholder="Add analyst note…" required/>
+            <button class="btn btn-outline-secondary" type="submit">
+              <i class="bi bi-send"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Audit Trail -->
+    <div class="card card-dark">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Alert Timeline</div>
+      <div class="card-body p-0">
+        <ul class="timeline-list">
+          {% for e in audit %}
+          <li class="timeline-item">
+            <span class="timeline-dot"></span>
+            <div class="timeline-content">
+              <div class="timeline-action">{{ e.action }}</div>
+              {% if e.note %}<div class="timeline-note text-muted small">{{ e.note }}</div>{% endif %}
+              <div class="timeline-time text-muted">{{ e.timestamp }}</div>
+            </div>
+          </li>
+          {% else %}
+          <li class="timeline-item"><span class="timeline-dot"></span>
+            <div class="timeline-content text-muted small">No events yet.</div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+  </div><!-- /right col -->
+</div>
+{% endblock %}

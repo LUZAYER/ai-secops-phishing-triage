@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}SOC Overview{% endblock %}
+
+{% block content %}
+<!-- STAT CARDS -->
+<div id="stats-container" hx-get="/" hx-select="#stats-container" hx-trigger="every 30s" hx-swap="outerHTML">
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon bg-primary-subtle text-primary"><i class="bi bi-envelope-exclamation"></i></div>
+      <div class="stat-body">
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-label">Total Alerts</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon bg-danger-subtle text-danger"><i class="bi bi-fire"></i></div>
+      <div class="stat-body">
+        <div class="stat-value text-danger">{{ stats.critical }}</div>
+        <div class="stat-label">Critical</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon bg-warning-subtle text-warning"><i class="bi bi-shield-exclamation"></i></div>
+      <div class="stat-body">
+        <div class="stat-value text-warning">{{ stats.high }}</div>
+        <div class="stat-label">High Severity</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon bg-success-subtle text-success"><i class="bi bi-check-shield"></i></div>
+      <div class="stat-body">
+        <div class="stat-value text-success">{{ stats.benign }}</div>
+        <div class="stat-label">Benign</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- TREND ROW -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card card-dark">
+      <div class="card-header"><i class="bi bi-graph-up me-2"></i>Email Threat Trend Over Time</div>
+      <div class="card-body">
+        <div style="height: 250px; position: relative;">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BREAKDOWN & TOP DOMAINS ROW -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card card-dark h-100">
+      <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Threat Category Distribution</div>
+      <div class="card-body d-flex justify-content-center align-items-center">
+        <div style="height: 220px; width: 100%; position: relative;">
+          <canvas id="classChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card card-dark h-100">
+      <div class="card-header"><i class="bi bi-list-nested me-2"></i>Top Targeted Senders/Domains</div>
+      <div class="card-body d-flex justify-content-center align-items-center">
+        <div style="height: 220px; width: 100%; position: relative;">
+          <canvas id="domainChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RECENT ALERTS -->
+<div id="recent-alerts-container" hx-get="/" hx-select="#recent-alerts-container" hx-trigger="every 30s" hx-swap="outerHTML">
+<div class="card card-dark">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-clock-history me-2"></i>Recent Critical Alerts</span>
+    <a href="/alerts/" class="btn btn-sm btn-outline-secondary">View All</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead><tr>
+          <th>ID</th><th>Subject</th><th>Classification</th><th>Severity</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for a in recent_alerts %}
+        <tr>
+          <td><code>{{ a.alert_id }}</code></td>
+          <td class="text-truncate" style="max-width:220px">{{ a.subject }}</td>
+          <td>{{ a.classification or '—' }}</td>
+          <td><span class="badge bg-{{ a.severity_color }}">{{ a.severity or '—' }}</span></td>
+          <td><span class="badge bg-{{ a.status_color }}">{{ a.status }}</span></td>
+          <td><a href="/alerts/{{ a.alert_id }}" class="btn btn-sm btn-outline-primary">View</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No alerts yet. Click <strong>Run Triage</strong> above.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let trendChartInst = null;
+let classChartInst = null;
+let domainChartInst = null;
+
+function renderCharts(trendData, classData, domainData) {
+  const PALETTE = ['#6366f1','#f59e0b','#ef4444','#10b981','#3b82f6','#8b5cf6'];
+  const SEV_COLORS = { Critical:'#ef4444', High:'#f59e0b', Medium:'#3b82f6', Low:'#6b7280', Unknown:'#475569' };
+
+  // --- 1. Threat Trend Timeline ---
+  const dates = [...new Set(trendData.map(d => d.date))].sort();
+  const severities = ['Critical', 'High', 'Medium', 'Low', 'Unknown'];
+  
+  const trendDatasets = severities.map(sev => {
+    const data = dates.map(date => {
+      const match = trendData.find(d => d.date === date && (d.severity || 'Unknown') === sev);
+      return match ? match.cnt : 0;
+    });
+    return {
+      label: sev,
+      data: data,
+      backgroundColor: SEV_COLORS[sev] || '#475569',
+      borderWidth: 0,
+      stack: 'Stack 0'
+    };
+  }).filter(ds => ds.data.some(v => v > 0)); // Only keep severities that have >0 data
+
+  if (trendChartInst) trendChartInst.destroy();
+  trendChartInst = new Chart(document.getElementById('trendChart'), {
+    type: 'bar',
+    data: {
+      labels: dates.length ? dates : ['No Data'],
+      datasets: trendDatasets.length ? trendDatasets : [{ data: [] }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { 
+        legend: { position: 'top', labels: { color: '#94a3b8' } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.05)' } }
+      }
+    }
+  });
+
+  // --- 2. Threat Category Distribution ---
+  if (classChartInst) classChartInst.destroy();
+  classChartInst = new Chart(document.getElementById('classChart'), {
+    type: 'doughnut',
+    data: {
+      labels: classData.map(d => d.classification || 'Unknown'),
+      datasets: [{ data: classData.map(d => d.cnt), backgroundColor: PALETTE, borderWidth: 0 }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: '#94a3b8' } } }
+    }
+  });
+
+  // --- 3. Top Targeted Domains ---
+  if (domainChartInst) domainChartInst.destroy();
+  domainChartInst = new Chart(document.getElementById('domainChart'), {
+    type: 'bar',
+    data: {
+      labels: domainData.map(d => d.domain),
+      datasets: [{
+        label: 'Incidents',
+        data: domainData.map(d => d.cnt),
+        backgroundColor: '#ef4444', // Red to indicate attacks
+        borderRadius: 4,
+        borderWidth: 0
+      }]
+    },
+    options: {
+      indexAxis: 'y', // horizontal
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.05)' } },
+        y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// Initial render
+renderCharts(
+  {{ stats.trend_data | tojson | safe }}, 
+  {{ stats.classification_breakdown | tojson | safe }},
+  {{ stats.top_domains | tojson | safe }}
+);
+
+// Fetch updates every 30 seconds
+setInterval(() => {
+  fetch('/api/stats')
+    .then(res => res.json())
+    .then(data => {
+      renderCharts(data.trend_data, data.classification_breakdown, data.top_domains);
+    })
+    .catch(err => console.error("Error fetching stats:", err));
+}, 30000);
+</script>
+{% endblock %}
